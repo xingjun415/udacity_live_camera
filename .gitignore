@@ -101,7 +101,6 @@ ENV/
 .mypy_cache/
 data/
 .idea/
-test.py
 json/*
 Untitled\ Folder/
 jsons/
