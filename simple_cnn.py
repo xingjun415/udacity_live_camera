@@ -24,8 +24,9 @@ img_width  = train_dataset.shape[2]
 num_channels = 1 if 3 >= len(train_dataset.shape) else train_dataset.shape[3]
 num_labels   = 11
 num_digits = 5
-patch_size = 5
+kernel_size = 3
 num_depth = 64
+num_hidden = 256
 
 def weight_variable(shape):
     return tf.Variable(tf.truncated_normal(shape, stddev= 0.1))
@@ -38,9 +39,29 @@ with graph.as_default():
     tf_train_dataset = tf.placeholder(tf.float32, shape=[batch_size, img_height, img_width, num_channels])
     tf_train_label   = [tf.placeholder(tf.float32, shape=[batch_size, num_labels], name="tf_train_labels_%d" % i) for i in range(num_digits)]
 
-    w_conv1 = weight_variable([patch_size, patch_size, num_channels, num_depth])
-    b_conv1 = bias_variable([num_depth])
+    layer1_w = weight_variable([kernel_size, kernel_size, num_channels, num_depth])
+    layer1_b = bias_variable([num_depth])
 
+    layer2_w = weight_variable([kernel_size, kernel_size, num_depth, num_depth])
+    layer2_b = bias_variable([num_depth])
 
+    layer3_w = weight_variable([img_width // 4 * img_height // 4 * num_depth, num_hidden])
+    layer3_b = bias_variable([num_hidden])
 
+    layer4_w = weight_variable([num_hidden, num_digits * num_labels])
+    layer4_b = bias_variable([num_digits * num_labels])
 
+    def model(data):
+        conv = tf.nn.conv2d(data, layer1_w, [1,2,2,1], padding="SAME")
+        hidden = tf.nn.relu(conv + layer1_b)
+        conv = tf.nn.conv2d(hidden, layer2_w, [1,2,2,1], padding="SAME")
+        hidden = tf.nn.relu( conv + layer2_b)
+        shape = hidden.get_shape().as_list()
+        reshape = tf.reshape( hidden, [shape[0], shape[1] * shape[2] * shape[3]])
+        hidden = tf.nn.relu(tf.matmul(reshape, layer3_w)) + layer3_b
+        output = tf.matmul(hidden, layer4_w) + layer4_b
+        split_logits = tf.split( output, num_digits, 1)
+        return split_logits
+
+    logits = model(tf_train_dataset)
+    loss = tf.reduce_mean([tf.nn.softmax_cross_entropy_with_logits(tf_train_label[i], logits[i]) for i in range(num_digits)], name="loss")
