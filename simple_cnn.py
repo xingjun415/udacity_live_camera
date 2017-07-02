@@ -65,3 +65,7 @@ with graph.as_default():
 
     logits = model(tf_train_dataset)
     loss = tf.reduce_mean([tf.nn.softmax_cross_entropy_with_logits(tf_train_label[i], logits[i]) for i in range(num_digits)], name="loss")
+
+    global_step = tf.Variable(0)
+    learning_rate = tf.train.exponential_decay( learning_rate,global_step, 100000,
+                                                learning_decay, name= "learning_rate")
